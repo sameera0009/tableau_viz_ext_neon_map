@@ -3,66 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Postal Code Map · Tableau Extension</title>
+    <title>Lat/Lon Map · Color by Measure</title>
     <!-- Tableau Extensions API -->
     <script src="https://cdn.jsdelivr.net/gh/tableau/extensions-api/lib/tableau.extensions.1.latest.js"></script>
-    <!-- Leaflet CSS + JS -->
+    <!-- Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <!-- D3 for color scales -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        html, body {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: #f0f2f5;
-            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
-        }
-        #map-container {
-            width: 100%;
-            height: 100%;
-            position: relative;
-        }
-        #map {
-            width: 100%;
-            height: 100%;
-            background: #e5e7eb;
-        }
-        .control-panel {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            background: white;
-            padding: 8px 14px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            font-size: 12px;
-            font-weight: 500;
-            z-index: 1000;
-            pointer-events: none;
-            backdrop-filter: blur(4px);
-            background: rgba(255,255,255,0.9);
-            border: 1px solid #ddd;
-        }
-        .legend-gradient {
-            width: 120px;
-            height: 8px;
-            background: linear-gradient(to right, #2c7bb6, #abd9e9, #ffffbf, #fdae61, #d7191c);
-            border-radius: 4px;
-            margin: 5px 0;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; }
+        #map { width: 100%; height: 100%; background: #e9ecef; }
         .loading-overlay {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.6);
             backdrop-filter: blur(4px);
             display: flex;
@@ -70,78 +25,105 @@
             justify-content: center;
             z-index: 2000;
             color: white;
-            font-weight: bold;
-            flex-direction: column;
+            font-weight: 500;
             gap: 12px;
+            flex-direction: column;
             pointer-events: none;
         }
         .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(255,255,255,0.3);
+            width: 36px; height: 36px;
+            border: 3px solid rgba(255,255,255,0.3);
             border-top-color: white;
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            animation: spin 0.8s linear infinite;
         }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .legend {
+            position: absolute;
+            bottom: 20px; right: 20px;
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(4px);
+            padding: 8px 14px;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid #ddd;
+            z-index: 1000;
+            pointer-events: none;
+        }
+        .legend-gradient {
+            width: 140px;
+            height: 8px;
+            background: linear-gradient(to right, #2c7bb6, #abd9e9, #ffffbf, #fdae61, #d7191c);
+            border-radius: 4px;
+            margin: 6px 0;
+        }
+        .legend-values {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #333;
         }
         .empty-state {
             position: absolute;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             background: white;
-            padding: 24px 32px;
+            padding: 20px 28px;
             border-radius: 16px;
             text-align: center;
             box-shadow: 0 4px 20px rgba(0,0,0,0.15);
             z-index: 1500;
-            font-size: 14px;
+            font-size: 13px;
+            max-width: 280px;
         }
-        .leaflet-tooltip.custom-tooltip {
-            font-weight: bold;
+        .tooltip-custom {
+            font-weight: 600;
             background: rgba(0,0,0,0.8);
             border: none;
             color: white;
             padding: 4px 8px;
             border-radius: 6px;
+            font-size: 12px;
         }
     </style>
 </head>
 <body>
-<div id="map-container">
-    <div id="map"></div>
-    <div class="control-panel" id="legendPanel" style="display: none;">
-        <div style="font-weight:600; margin-bottom:4px;">📊 Measure</div>
-        <div class="legend-gradient"></div>
-        <div style="display: flex; justify-content: space-between; font-size:10px;">
-            <span id="legendMin">Low</span>
-            <span id="legendMax">High</span>
-        </div>
-    </div>
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="spinner"></div>
-        <div>Geocoding postal codes...</div>
+<div id="map"></div>
+<div id="loadingOverlay" class="loading-overlay" style="display: none;">
+    <div class="spinner"></div>
+    <div>Loading map data...</div>
+</div>
+<div id="legend" class="legend" style="display: none;">
+    <div>📊 Color by Measure</div>
+    <div class="legend-gradient"></div>
+    <div class="legend-values">
+        <span id="legendMin">—</span>
+        <span id="legendMax">—</span>
     </div>
 </div>
 
 <script>
     (function() {
-        // --- DOM elements ---
-        const mapDiv = document.getElementById('map');
-        const loadingDiv = document.getElementById('loadingOverlay');
-        const legendPanel = document.getElementById('legendPanel');
-        const legendMinSpan = document.getElementById('legendMin');
-        const legendMaxSpan = document.getElementById('legendMax');
-
         let map = null;
-        let markerGroup = null;       // Layer group for circles
-        let currentData = [];         // stores { postal, measure, lat, lon }
-        let geocodeCache = new Map();  // postal -> { lat, lon }
+        let markerLayer = null;
         let worksheet = null;
+        let resizeObserver = null;
 
-        // --- Helper: format numbers (K, M, B)
+        // Initialize Leaflet map
+        function initMap() {
+            if (map) map.remove();
+            map = L.map('map').setView([39.8283, -98.5795], 4);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CartoDB',
+                subdomains: 'abcd',
+                maxZoom: 18
+            }).addTo(map);
+            markerLayer = L.layerGroup().addTo(map);
+        }
+
+        // Format numbers for legend and tooltips
         function formatNumber(n) {
             if (n === null || isNaN(n)) return '—';
             const abs = Math.abs(n);
@@ -151,168 +133,101 @@
             return n.toFixed(2);
         }
 
-        // --- Initialize Leaflet map (centered on US / world)
-        function initMap() {
-            if (map) map.remove();
-            map = L.map('map').setView([39.8283, -98.5795], 4); // centered on USA
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CartoDB',
-                subdomains: 'abcd',
-                maxZoom: 19
-            }).addTo(map);
-            markerGroup = L.layerGroup().addTo(map);
-        }
-
-        // --- Geocode a single postal code using Nominatim (cached)
-        async function geocodePostalCode(postal) {
-            if (geocodeCache.has(postal)) {
-                return geocodeCache.get(postal);
-            }
-            // Respectful delay: 1 request per second (simple throttle)
-            await new Promise(resolve => setTimeout(resolve, 200));
-            const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(postal)}&countrycodes=us,ca,gb,de,fr,au&format=json&limit=1`;
-            try {
-                const response = await fetch(url, {
-                    headers: { 'User-Agent': 'TableauExtension-PostalMap/1.0' }
-                });
-                const data = await response.json();
-                if (data && data.length > 0) {
-                    const lat = parseFloat(data[0].lat);
-                    const lon = parseFloat(data[0].lon);
-                    const coord = { lat, lon };
-                    geocodeCache.set(postal, coord);
-                    return coord;
-                } else {
-                    geocodeCache.set(postal, null);
-                    return null;
-                }
-            } catch (err) {
-                console.warn(`Geocoding failed for ${postal}:`, err);
-                geocodeCache.set(postal, null);
-                return null;
-            }
-        }
-
-        // --- Batch geocode unique postal codes (with concurrency limit)
-        async function batchGeocode(postalCodes) {
-            const unique = [...new Set(postalCodes.filter(p => p && p.trim() !== ''))];
-            const results = new Map();
-            // Process one by one to be gentle
-            for (const p of unique) {
-                const coord = await geocodePostalCode(p);
-                results.set(p, coord);
-            }
-            return results;
-        }
-
-        // --- Draw circles on map with color scale based on measure
-        function drawMap(dataPoints, measureValues, colorScale, minVal, maxVal) {
-            markerGroup.clearLayers();
-            if (!dataPoints.length) return;
-
-            for (let i = 0; i < dataPoints.length; i++) {
-                const point = dataPoints[i];
-                if (!point.lat || !point.lon) continue;
-                const measure = measureValues[i];
-                const color = colorScale(measure);
-                const radius = Math.max(8, Math.min(28, 8 + (measure - minVal) / (maxVal - minVal) * 20));
-                const circle = L.circleMarker([point.lat, point.lon], {
-                    radius: radius,
-                    fillColor: color,
-                    color: '#ffffff',
-                    weight: 1.5,
-                    opacity: 0.9,
-                    fillOpacity: 0.7
-                }).addTo(markerGroup);
-                circle.bindTooltip(`${point.postal}<br><strong>${formatNumber(measure)}</strong>`, {
-                    permanent: false,
-                    direction: 'top',
-                    className: 'custom-tooltip'
-                });
-            }
-            // Fit bounds to markers
-            if (markerGroup.getLayers().length > 0) {
-                const bounds = markerGroup.getBounds();
-                if (bounds.isValid()) map.fitBounds(bounds, { padding: [30,30] });
-            }
-        }
-
-        // --- Main render: fetch data from Tableau, geocode, draw map
-        async function renderExtension() {
+        // Main rendering: read data, plot circles with color scale
+        async function renderMap() {
             if (!worksheet) return;
+            const loadingDiv = document.getElementById('loadingOverlay');
+            const legendDiv = document.getElementById('legend');
             loadingDiv.style.display = 'flex';
-            legendPanel.style.display = 'none';
+            legendDiv.style.display = 'none';
 
             try {
-                // 1. Get data and encodings
+                // Get data and encodings
                 const rows = await getTableauData(worksheet);
-                const encodings = await getEncodings(worksheet);
+                const enc = await getEncodings(worksheet);
 
-                const postalField = encodings.postal_code?.name;
-                const measureField = encodings.measure?.name;
+                const latField = enc.latitude?.name;
+                const lonField = enc.longitude?.name;
+                const measureField = enc.measure?.name;
+                const labelField = enc.label?.name;  // optional, for tooltip
 
-                if (!postalField || !measureField || rows.length === 0) {
-                    showEmptyState("Drop a postal code dimension on 'Postal Code' and a measure on 'Measure'.");
+                if (!latField || !lonField || !measureField) {
+                    showEmptyState("Please assign:\n• Latitude (numeric)\n• Longitude (numeric)\n• Measure (numeric)");
                     return;
                 }
 
-                // Extract postal codes and measures
-                const postalList = [];
-                const measureList = [];
+                // Extract points
+                const points = [];
+                const measures = [];
                 for (const row of rows) {
-                    let postal = row[postalField]?.formattedValue || row[postalField]?.value || '';
-                    postal = String(postal).trim();
+                    let lat = parseFloat(row[latField]?.nativeValue ?? row[latField]?.value);
+                    let lon = parseFloat(row[lonField]?.nativeValue ?? row[lonField]?.value);
                     let measure = parseFloat(row[measureField]?.nativeValue ?? row[measureField]?.value);
-                    if (postal && !isNaN(measure)) {
-                        postalList.push(postal);
-                        measureList.push(measure);
+                    let label = labelField ? (row[labelField]?.formattedValue || row[labelField]?.value || '') : '';
+                    if (!isNaN(lat) && !isNaN(lon) && !isNaN(measure)) {
+                        points.push({ lat, lon, measure, label });
+                        measures.push(measure);
                     }
                 }
-                if (postalList.length === 0) {
-                    showEmptyState("No valid postal code + measure pairs found.");
+
+                if (points.length === 0) {
+                    showEmptyState("No valid points found. Check that Latitude/Longitude are numeric and Measure is not null.");
                     return;
                 }
 
-                // 2. Geocode unique postal codes
-                const geocodeResults = await batchGeocode(postalList);
-                const dataPoints = [];
-                const validMeasures = [];
-                for (let i = 0; i < postalList.length; i++) {
-                    const p = postalList[i];
-                    const coord = geocodeResults.get(p);
-                    if (coord) {
-                        dataPoints.push({ postal: p, lat: coord.lat, lon: coord.lon });
-                        validMeasures.push(measureList[i]);
-                    }
-                }
-                if (dataPoints.length === 0) {
-                    showEmptyState("Could not geocode any postal code. Check that they are valid (US/CA/GB/DE/FR/AU).");
-                    return;
+                // Color scale (sequential, handles positive/negative)
+                const minVal = Math.min(...measures);
+                const maxVal = Math.max(...measures);
+                let colorScale;
+                if (minVal >= 0) {
+                    colorScale = d3.scaleSequentialLog()
+                        .domain([Math.max(0.01, minVal), maxVal])
+                        .interpolator(d3.interpolateYlOrRd);
+                } else {
+                    // Diverging for negative values
+                    const absMax = Math.max(Math.abs(minVal), Math.abs(maxVal));
+                    colorScale = d3.scaleSequentialLog()
+                        .domain([-absMax, absMax])
+                        .interpolator(d3.interpolateRdBu);
                 }
 
-                // 3. Color scale (sequential)
-                const minVal = Math.min(...validMeasures);
-                const maxVal = Math.max(...validMeasures);
-                const colorScale = d3.scaleSequentialLog()
-                    .domain([Math.max(0.01, minVal), maxVal])
-                    .interpolator(d3.interpolateYlOrRd);
-                // Fallback for zero or negative: use linear scale
-                const finalScale = (minVal >= 0) ? colorScale : d3.scaleSequentialLog()
-                    .domain([minVal, maxVal])
-                    .interpolator(d3.interpolateRdYlBu);
-                
-                const useScale = (minVal >= 0) ? colorScale : finalScale;
-
-                // 4. Initialize map if needed
+                // Initialize map if needed
                 if (!map) initMap();
-                else markerGroup.clearLayers();
+                else markerLayer.clearLayers();
 
-                drawMap(dataPoints, validMeasures, useScale, minVal, maxVal);
+                // Draw circles
+                for (const p of points) {
+                    const radius = Math.max(6, Math.min(24, 6 + (p.measure - minVal) / (maxVal - minVal) * 18));
+                    const color = colorScale(p.measure);
+                    const circle = L.circleMarker([p.lat, p.lon], {
+                        radius: radius,
+                        fillColor: color,
+                        color: '#ffffff',
+                        weight: 1.2,
+                        opacity: 0.9,
+                        fillOpacity: 0.75
+                    }).addTo(markerLayer);
+
+                    const tooltipContent = p.label 
+                        ? `<strong>${p.label}</strong><br>${formatNumber(p.measure)}`
+                        : `<strong>${formatNumber(p.measure)}</strong>`;
+                    circle.bindTooltip(tooltipContent, {
+                        permanent: false,
+                        direction: 'top',
+                        className: 'tooltip-custom'
+                    });
+                }
+
+                // Fit map bounds to points
+                const bounds = markerLayer.getBounds();
+                if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30] });
+
                 // Update legend
-                legendMinSpan.innerText = formatNumber(minVal);
-                legendMaxSpan.innerText = formatNumber(maxVal);
-                legendPanel.style.display = 'block';
+                document.getElementById('legendMin').innerText = formatNumber(minVal);
+                document.getElementById('legendMax').innerText = formatNumber(maxVal);
+                legendDiv.style.display = 'block';
                 hideEmptyState();
+
             } catch (err) {
                 console.error(err);
                 showEmptyState("Error loading data: " + err.message);
@@ -321,7 +236,7 @@
             }
         }
 
-        // --- Tableau data helpers ---
+        // Tableau data helpers
         async function getTableauData(worksheetObj) {
             let allRows = [];
             const reader = await worksheetObj.getSummaryDataReaderAsync(undefined, { ignoreSelection: true });
@@ -346,36 +261,43 @@
             return encMap;
         }
 
-        // --- UI helpers ---
+        // UI state helpers
         let emptyDiv = null;
         function showEmptyState(message) {
             if (emptyDiv) emptyDiv.remove();
             emptyDiv = document.createElement('div');
             emptyDiv.className = 'empty-state';
-            emptyDiv.innerHTML = `<strong>⚠️ No data</strong><br>${message}`;
-            document.getElementById('map-container').appendChild(emptyDiv);
-            if (markerGroup) markerGroup.clearLayers();
-            legendPanel.style.display = 'none';
+            emptyDiv.innerHTML = `<strong>⚠️ Incomplete configuration</strong><br>${message.replace(/\n/g, '<br>')}`;
+            document.body.appendChild(emptyDiv);
+            if (markerLayer) markerLayer.clearLayers();
+            document.getElementById('legend').style.display = 'none';
         }
         function hideEmptyState() {
             if (emptyDiv) emptyDiv.remove();
             emptyDiv = null;
         }
 
-        // --- Extension lifecycle ---
-        async function initExtension() {
+        // Extension initialization
+        async function init() {
             try {
                 await tableau.extensions.initializeAsync();
                 worksheet = tableau.extensions.worksheetContent.worksheet;
                 initMap();
-                await renderExtension();
-                worksheet.addEventListener(tableau.TableauEventType.SummaryDataChanged, renderExtension);
+                await renderMap();
+                // Listen for data changes
+                worksheet.addEventListener(tableau.TableauEventType.SummaryDataChanged, renderMap);
+                // Optional: listen for resize
+                if (window.ResizeObserver) {
+                    resizeObserver = new ResizeObserver(() => { if (map) map.invalidateSize(); });
+                    resizeObserver.observe(document.getElementById('map'));
+                }
             } catch (err) {
                 console.error(err);
-                showEmptyState("Tableau Extension failed to initialize.");
+                showEmptyState("Extension failed to initialize.");
             }
         }
-        initExtension();
+
+        init();
     })();
 </script>
 </body>
